@@ -3,45 +3,63 @@ import './App.css';
 import Navbar from './components/navbar';
 import SubscriptionCard from './components/subcard';
 import Cart from './components/cart';
+import Login from './components/Login';
+import CreditCard from './components/CreditCard';
 import list from './data';
 
 function App() {
   const [cartItems, setCartItems] = useState([]);
   const [showCart, setShowCart] = useState(false);
+  const [showCreditCard, setShowCreditCard] = useState(false);
   const [warning, setWarning] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Check authentication on mount
+  useEffect(() => {
+    const userAuth = localStorage.getItem('userAuth');
+    if (userAuth) {
+      try {
+        const user = JSON.parse(userAuth);
+        setIsAuthenticated(user.loggedIn);
+      } catch (error) {
+        console.error('Error parsing user auth:', error);
+        setIsAuthenticated(false);
+      }
+    }
+  }, []);
 
   // Load cart from localStorage on mount
   useEffect(() => {
-    console.log('🔵 Component mounted - Loading cart...');
     const savedCart = localStorage.getItem('eztechCart');
-    console.log('🔵 Saved cart from localStorage:', savedCart);
     
     if (savedCart) {
       try {
         const parsed = JSON.parse(savedCart);
-        console.log('🔵 Parsed cart items:', parsed);
         setCartItems(parsed);
       } catch (error) {
-        console.error('❌ Error parsing cart:', error);
+        console.error('Error parsing cart:', error);
       }
     }
     setIsLoaded(true);
   }, []);
 
-  // Save cart to localStorage whenever it changes (only after initial load)
+  // Save cart to localStorage whenever it changes
   useEffect(() => {
     if (isLoaded) {
-      console.log('🟢 Saving to localStorage:', cartItems);
       localStorage.setItem('eztechCart', JSON.stringify(cartItems));
     }
   }, [cartItems, isLoaded]);
+
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   const addToCart = (item) => {
     const isSubscription = item.id <= 4;
     const hasSubscription = cartItems.some(cartItem => cartItem.id <= 4);
 
-    // Check if trying to add a subscription when one already exists
     if (isSubscription && hasSubscription) {
       setWarning('You can only add one subscription at a time. Please remove your current subscription first.');
       setTimeout(() => setWarning(''), 4000);
@@ -51,13 +69,11 @@ function App() {
     const existingItem = cartItems.find(cartItem => cartItem.id === item.id);
 
     if (existingItem) {
-      // For subscriptions, show warning
       if (isSubscription) {
         setWarning('This subscription is already in your cart.');
         setTimeout(() => setWarning(''), 4000);
         return;
       }
-      // For accessories, increase quantity
       setCartItems(cartItems.map(cartItem =>
         cartItem.id === item.id
           ? { ...cartItem, quantity: cartItem.quantity + 1 }
@@ -90,11 +106,22 @@ function App() {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
+  const handleCheckout = () => {
+    setShowCart(false);
+    setShowCreditCard(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('userAuth');
+    setIsAuthenticated(false);
+  };
+
   return (
     <div className="App">
       <Navbar 
         cartCount={getTotalItems()} 
         onCartClick={() => setShowCart(!showCart)}
+        onLogout={handleLogout}
       />
       
       {warning && (
@@ -146,6 +173,16 @@ function App() {
           onRemove={removeFromCart}
           onUpdateQuantity={updateQuantity}
           totalPrice={getTotalPrice()}
+          onCheckout={handleCheckout}
+        />
+      )}
+
+      {showCreditCard && (
+        <CreditCard
+          onClose={() => setShowCreditCard(false)}
+          onSaveCard={(card) => {
+            console.log('Card saved:', card);
+          }}
         />
       )}
     </div>
